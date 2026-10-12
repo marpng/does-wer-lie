@@ -24,6 +24,5 @@ __pycache__/
 .DS_Store
 
 # Local, not part of the project
-.claude/
 *.pdf
 *.jpeg
