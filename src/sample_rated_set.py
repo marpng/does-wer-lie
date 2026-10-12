@@ -1,24 +1,13 @@
-"""Sample the utterances that humans will rate, stratified by WER.
+"""Sample the items humans will rate, stratified by WER. One item = one sentence + one model's output.
 
-A rated item is one sentence plus the output of ONE model for it. Outputs are drawn from all
-baseline models, because the best model alone produces too few bad transcripts to stratify on.
-
-Procedure (seeded, reproducible):
-  1. Sentence difficulty = WER of the worst model output, averaged over the languages in a group.
-  2. Sentences are drawn evenly from difficulty bands; a short band is topped up from the others.
-  3. Per language, each chosen sentence gets the model whose output lands in the WER band that
-     is least filled so far, which flattens the WER distribution of the rated items.
-
-Languages given to --parallel share the SAME sentences (FLEURS sentence IDs are parallel).
-All other languages are sampled independently.
-
-Usage:
-    python src/sample_rated_set.py --parallel en el
     python src/sample_rated_set.py --parallel en it de el --overlap-language en --overlap-size 30
-    python src/sample_rated_set.py --parallel en el --out ratings/pilot/rated_set_ids.csv --per-language 10
 
-Output (IDs only, no WER, safe to commit and to show to raters):
-    ratings/rated_set_ids.csv   columns: item_id, language, id, sentence_id, model, overlap
+1. Sentence difficulty = WER of the worst model, averaged over the languages in a group.
+2. Sentences are drawn evenly from the difficulty bands.
+3. Per language, each sentence gets the model whose output falls in the least-filled WER band.
+
+--parallel languages share the same sentences; the others are sampled independently.
+Writes ratings/rated_set_ids.csv (item_id, language, id, sentence_id, model, overlap), no WER.
 """
 
 import argparse
@@ -40,22 +29,22 @@ def band(wer: pd.Series) -> pd.Series:
 
 
 def pick_sentences(difficulty: pd.Series, n: int, rng: np.random.Generator) -> list[str]:
-    """Equal numbers per difficulty band; bands that run out are topped up from the rest."""
+    """Round-robin over the bands, hardest first, until n sentences are chosen."""
     bands = band(difficulty)
     pools = {b: list(rng.permutation(difficulty.index[bands == b])) for b in BAND_LABELS}
     chosen = []
     while len(chosen) < n and any(pools.values()):
-        for b in reversed(BAND_LABELS):  # hardest first, so rare bands are never crowded out
+        for b in reversed(BAND_LABELS):
             if pools[b] and len(chosen) < n:
                 chosen.append(pools[b].pop())
     return chosen
 
 
 def assign_models(wer: pd.DataFrame, sentences: list[str], rng: np.random.Generator) -> pd.DataFrame:
-    """wer: sentence_id x model table for one language. One model per sentence, flattening the bands."""
+    """wer: sentence_id x model table of one language. Returns one model per sentence."""
     filled = dict.fromkeys(BAND_LABELS, 0)
     rows = []
-    # Sentences with the fewest distinct bands on offer are placed first: they leave the least choice.
+    # Sentences whose models all fall in one band go first: they leave no choice.
     order = sorted(rng.permutation(sentences), key=lambda s: band(wer.loc[s]).nunique())
     for sentence in order:
         options = band(wer.loc[sentence])
@@ -73,17 +62,19 @@ def main() -> None:
     parser.add_argument("--overlap-language", help="language whose items are partly rated by both raters")
     parser.add_argument("--overlap-size", type=int, default=30)
     parser.add_argument("--out", type=Path, default=ROOT / "ratings" / "rated_set_ids.csv")
-    parser.add_argument("--force", action="store_true", help="overwrite an existing (frozen) file")
+    parser.add_argument("--force", action="store_true", help="replace an existing file")
     args = parser.parse_args()
 
     if args.out.exists() and not args.force:
-        raise SystemExit(f"{args.out} already exists. The rated set is frozen; use --force only before rating starts.")
+        raise SystemExit(f"{args.out} already exists; use --force only before rating has started.")
 
     metrics = pd.read_csv(METRICS)
     metrics = metrics[metrics["normalisation"] == args.normalisation]
     sentence_of = pd.concat([pd.read_csv(p, dtype=str) for p in EVAL_DIR.glob("*.csv")]).set_index("id")["sentence_id"]
     metrics["sentence_id"] = metrics["id"].map(sentence_of)
     languages = sorted(metrics["language"].unique())
+    if unknown := set(args.parallel + [args.overlap_language or languages[0]]) - set(languages):
+        raise SystemExit(f"No baseline metrics for: {sorted(unknown)}")
 
     groups = ([args.parallel] if args.parallel else []) + [[l] for l in languages if l not in args.parallel]
     rng = np.random.default_rng(SEED)
@@ -93,6 +84,8 @@ def main() -> None:
         shared = sorted(set.intersection(*(set(t.index) for t in tables.values())))
         difficulty = pd.concat([tables[l].loc[shared].max(axis=1) for l in group], axis=1).mean(axis=1)
         sentences = pick_sentences(difficulty, args.per_language, rng)
+        if len(sentences) < args.per_language:
+            print(f"WARNING {group}: only {len(sentences)} sentences available")
         for language in group:
             chosen = assign_models(tables[language], sentences, rng)
             chosen.insert(0, "language", language)
@@ -102,17 +95,17 @@ def main() -> None:
     lookup = metrics.set_index(["language", "sentence_id", "model"])
     keys = list(zip(rated["language"], rated["sentence_id"], rated["model"]))
     rated["id"] = lookup.loc[keys, "id"].values
-    wer = lookup.loc[keys, "wer"].values  # used for reporting and the overlap draw only, never saved
+    wer = lookup.loc[keys, "wer"].values  # for the overlap draw and the printed summary only
 
     rated["overlap"] = False
     if args.overlap_language:
         pool = rated[rated["language"] == args.overlap_language].assign(band=band(pd.Series(wer, index=rated.index)))
-        # Spread the overlap items over the WER bands as well.
+        # Round-robin over the WER bands.
         pool = pool.sample(frac=1, random_state=SEED)
         order = pool.assign(rank=pool.groupby("band", observed=True).cumcount()).sort_values("rank", kind="stable")
         rated.loc[order.index[: args.overlap_size], "overlap"] = True
 
-    # Shuffled presentation order, so the item number tells raters nothing about difficulty.
+    # Shuffle so the item number says nothing about difficulty.
     rated = rated.sample(frac=1, random_state=SEED).sort_values("language", kind="stable").reset_index(drop=True)
     rated.insert(0, "item_id", rated["language"] + "_" + (rated.groupby("language").cumcount() + 1).astype(str).str.zfill(3))
 

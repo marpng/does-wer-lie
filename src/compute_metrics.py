@@ -1,23 +1,18 @@
-"""Compute WER and CER for every transcription file in a results directory.
+"""WER and CER for every transcription file in a results directory.
 
-References always come from the raw (cased, punctuated) manifest reference, and reference and
-hypothesis go through the same normaliser.
-
-Normalisations:
-    raw          whitespace collapsed, nothing else
-    standard     Whisper's BasicTextNormalizer (lowercase, punctuation and bracketed text removed)
-    standard_en  Whisper's EnglishTextNormalizer (numbers, contractions, spelling); English only
-
-Usage:
     python src/compute_metrics.py
     python src/compute_metrics.py --results-dir results/finetuned --name finetuned
 
-Output (in results/metrics/):
-    {name}_per_utterance.csv   one row per utterance x model x normalisation
-    {name}_table.csv / .md     corpus-level WER and CER, model x language x normalisation
+Normalisations (applied to reference_raw and hypothesis alike):
+    raw          whitespace only
+    standard     Whisper BasicTextNormalizer
+    standard_en  Whisper EnglishTextNormalizer, English only
+
+Writes results/metrics/{name}_per_utterance.csv, {name}_table.csv and {name}_table.md.
 """
 
 import argparse
+import unicodedata
 from pathlib import Path
 
 import jiwer
@@ -36,6 +31,12 @@ WER_BIN_LABELS = ["0", "0–5%", "5–15%", "15–30%", ">30%"]
 
 _basic = BasicTextNormalizer()
 _english = EnglishTextNormalizer()
+
+
+def clean(text: str) -> str:
+    """Same Unicode form everywhere, no invisible format characters (zero-width space etc.)."""
+    text = unicodedata.normalize("NFC", text)
+    return "".join(c for c in text if unicodedata.category(c) != "Cf")
 
 
 def normalisers(language: str) -> dict:
@@ -70,9 +71,10 @@ def per_utterance(results_dir: Path) -> pd.DataFrame:
     rows = []
     for row in df.itertuples():
         for name, normalise in normalisers(row.language).items():
-            reference, hypothesis = normalise(row.reference_raw).strip(), normalise(row.hypothesis).strip()
+            reference = normalise(clean(row.reference_raw)).strip()
+            hypothesis = normalise(clean(row.hypothesis)).strip()
             if not reference:
-                continue  # nothing left to score against
+                continue
             counts = error_counts(reference, hypothesis)
             rows.append({
                 "id": row.id, "language": row.language, "model": row.model, "normalisation": name,
@@ -85,9 +87,10 @@ def per_utterance(results_dir: Path) -> pd.DataFrame:
 
 def ordered(df: pd.DataFrame) -> pd.DataFrame:
     df = df.copy()
-    df["language"] = pd.Categorical(df["language"], [l for l in LANG_ORDER if l in set(df["language"])])
-    known = [m for m in MODEL_ORDER if m in set(df["model"])]
-    df["model"] = pd.Categorical(df["model"], known + sorted(set(df["model"]) - set(known)))
+    for column, order in [("language", LANG_ORDER), ("model", MODEL_ORDER)]:
+        present = set(df[column])
+        known = [v for v in order if v in present]
+        df[column] = pd.Categorical(df[column], known + sorted(present - set(known)))
     return df
 
 
@@ -105,7 +108,7 @@ def corpus_table(utt: pd.DataFrame) -> pd.DataFrame:
 
 
 def wer_distribution(utt: pd.DataFrame, normalisation: str) -> pd.DataFrame:
-    """How many utterances fall in each WER band: decides whether a WER-stratified rated set is possible."""
+    """Utterances per WER band."""
     sub = ordered(utt[utt["normalisation"] == normalisation])
     bands = pd.cut(sub["wer"], WER_BINS, labels=WER_BIN_LABELS)
     counts = sub.groupby(["language", "model"], observed=True)[[]].size().index

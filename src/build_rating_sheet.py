@@ -1,18 +1,10 @@
-"""Build an offline rating sheet (one HTML page plus audio) for one language.
+"""Build an offline rating sheet for one language: audio, reference, model output. No model name, no WER.
 
-Raters see audio, reference and model output. Model name and WER are never written to the sheet.
-Audio is peak-normalised so that quiet recordings are audible.
-
-Usage:
     python src/build_rating_sheet.py --language el
-    python src/build_rating_sheet.py --language en --overlap-only        # the shared agreement set
-    python src/build_rating_sheet.py --language el --items ratings/pilot/rated_set_ids.csv --name pilot_el
+    python src/build_rating_sheet.py --language en --overlap-only
 
-Output (not committed: contains audio and reference text):
-    ratings/sheets/{name}/index.html
-    ratings/sheets/{name}/audio/{item_id}.wav
-
-Open index.html in a browser, rate, then press "Download CSV" and save the file to ratings/scores/.
+Writes ratings/sheets/{name}/index.html and audio/ (peak-normalised). Not committed.
+Rate in a browser, press "Download CSV", save the file to ratings/scores/.
 """
 
 import argparse
@@ -39,9 +31,12 @@ def load_items(items_path: Path, language: str, overlap_only: bool) -> pd.DataFr
         raise SystemExit(f"No items for language '{language}' in {items_path}.")
 
     manifests = pd.concat([pd.read_csv(p, keep_default_na=False) for p in MANIFEST_DIR.glob("*.csv")])
-    items = items.merge(manifests[["id", "audio_path", "reference_raw"]], on="id", validate="many_to_one")
     hyps = pd.concat([pd.read_csv(p, keep_default_na=False) for p in BASELINE_DIR.glob(f"*_{language}.csv")])
-    return items.merge(hyps[["id", "model", "hypothesis"]], on=["id", "model"], validate="one_to_one")
+    merged = items.merge(manifests[["id", "audio_path", "reference_raw"]], on="id", validate="many_to_one")
+    merged = merged.merge(hyps[["id", "model", "hypothesis"]], on=["id", "model"], validate="one_to_one")
+    if len(merged) != len(items) or (merged["audio_path"] == "").any():
+        raise SystemExit("Some items have no audio, reference or model output on this machine.")
+    return merged
 
 
 def export_audio(source: Path, target: Path) -> None:
@@ -57,7 +52,7 @@ def main() -> None:
     parser.add_argument("--language", required=True)
     parser.add_argument("--items", type=Path, default=ROOT / "ratings" / "rated_set_ids.csv")
     parser.add_argument("--overlap-only", action="store_true")
-    parser.add_argument("--name", help="sheet folder name (default: the language, or {language}_overlap)")
+    parser.add_argument("--name", help="sheet folder name (default: {language} or {language}_overlap)")
     args = parser.parse_args()
 
     items = load_items(args.items, args.language, args.overlap_only)

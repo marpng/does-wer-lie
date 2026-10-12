@@ -1,16 +1,10 @@
-"""Download FLEURS for the given languages and write one manifest per language.
+"""Download FLEURS and write one manifest per language.
 
-FLEURS audio is already 16 kHz mono WAV, so no resampling is needed here.
-
-Usage:
     python src/prepare_fleurs.py --langs en_us el_gr
-    python src/prepare_fleurs.py --langs it_it de_de --splits test
-    python src/prepare_fleurs.py --langs el_gr --splits train dev test   # train is ~2 GB
+    python src/prepare_fleurs.py --langs el_gr --splits train dev test   # train audio is ~2 GB
 
-Output:
-    data/raw/fleurs/{lang}/{split}.tsv            original metadata
-    data/raw/fleurs/{lang}/audio/{split}/*.wav    extracted audio
-    data/manifests/fleurs_{lang}.csv              shared manifest format
+Writes data/raw/fleurs/{lang}/ and data/manifests/fleurs_{lang}.csv.
+Splits not listed in --splits get transcript rows with an empty audio_path.
 """
 
 import argparse
@@ -25,7 +19,7 @@ REPO = "google/fleurs"
 ROOT = Path(__file__).resolve().parents[1]
 RAW_DIR = ROOT / "data" / "raw" / "fleurs"
 MANIFEST_DIR = ROOT / "data" / "manifests"
-SAMPLE_RATE = 16_000
+SAMPLE_RATE = 16_000  # FLEURS audio is already 16 kHz mono
 
 TSV_COLUMNS = ["sentence_id", "file_name", "reference_raw", "reference", "chars", "num_samples", "gender"]
 MANIFEST_COLUMNS = [
@@ -39,7 +33,7 @@ def fetch(lang: str, filename: str) -> Path:
 
 
 def read_tsv(path: Path) -> pd.DataFrame:
-    # No header, and transcripts contain stray quote characters, so quoting must be off.
+    # No header; transcripts contain stray quote characters.
     return pd.read_csv(path, sep="\t", header=None, names=TSV_COLUMNS, quoting=csv.QUOTE_NONE, dtype=str)
 
 
@@ -57,7 +51,7 @@ def prepare_split(lang: str, split: str, with_audio: bool) -> pd.DataFrame:
         archive = fetch(lang, f"audio/{split}.tar.gz")
         with tarfile.open(archive) as tar:
             tar.extractall(lang_dir / "audio", filter="data")
-        archive.unlink()  # the extracted WAVs are all we need
+        archive.unlink()
 
     df["id"] = f"fleurs_{lang}_{split}_" + df["file_name"].str.removesuffix(".wav")
     df["language"] = lang.split("_")[0]
@@ -69,31 +63,30 @@ def prepare_split(lang: str, split: str, with_audio: bool) -> pd.DataFrame:
     df["duration"] = (df["num_samples"].astype(int) / SAMPLE_RATE).round(3)
     df["gender"] = df["gender"].str.lower()
     df["dialect"] = ""
+
+    missing = int((df["audio_path"] == "").sum())
+    if with_audio and missing:
+        print(f"[{lang}] WARNING {split}: {missing} of {len(df)} audio files missing. "
+              f"If the download was interrupted, delete {audio_dir.relative_to(ROOT)} and rerun.")
     return df[MANIFEST_COLUMNS]
 
 
 def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
-    parser.add_argument("--langs", nargs="+", required=True, help="FLEURS language codes, e.g. en_us el_gr it_it de_de")
+    parser.add_argument("--langs", nargs="+", required=True, help="e.g. en_us el_gr it_it de_de")
     parser.add_argument("--splits", nargs="+", default=["dev", "test"], choices=["train", "dev", "test"],
-                        help="splits whose AUDIO is downloaded (default: dev test)")
-    parser.add_argument("--no-metadata-only-splits", action="store_true",
-                        help="skip the transcript-only rows for splits whose audio was not requested")
+                        help="splits whose audio is downloaded")
     args = parser.parse_args()
 
     MANIFEST_DIR.mkdir(parents=True, exist_ok=True)
     for lang in args.langs:
-        frames = []
-        for split in ["train", "dev", "test"]:
-            with_audio = split in args.splits
-            if not with_audio and args.no_metadata_only_splits:
-                continue
-            print(f"[{lang}] {split}: {'audio + metadata' if with_audio else 'metadata only'}")
-            frames.append(prepare_split(lang, split, with_audio))
-        manifest = pd.concat(frames, ignore_index=True)
+        manifest = pd.concat(
+            [prepare_split(lang, split, split in args.splits) for split in ["train", "dev", "test"]],
+            ignore_index=True,
+        )
         out = MANIFEST_DIR / f"fleurs_{lang}.csv"
         manifest.to_csv(out, index=False)
-        print(f"[{lang}] wrote {len(manifest)} rows -> {out.relative_to(ROOT)}")
+        print(f"[{lang}] {len(manifest)} rows -> {out.relative_to(ROOT)}")
 
 
 if __name__ == "__main__":

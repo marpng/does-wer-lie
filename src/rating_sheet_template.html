@@ -162,7 +162,7 @@
   $("next").onclick = () => show(current + 1);
 
   document.addEventListener("keydown", (e) => {
-    if (["TEXTAREA", "INPUT"].includes(e.target.tagName) || e.metaKey || e.ctrlKey || e.altKey) return;
+    if (["TEXTAREA", "INPUT", "AUDIO"].includes(e.target.tagName) || e.metaKey || e.ctrlKey || e.altKey) return;
     const audio = $("audio");
     if (e.key === "1") rate("fully");
     else if (e.key === "2") rate("partly");

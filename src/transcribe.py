@@ -1,16 +1,9 @@
 """Transcribe an evaluation set with zero-shot Whisper (faster-whisper).
 
-The language is always set explicitly. For Swiss German pass --whisper-language de.
-Existing output files are never overwritten: a model/language pair that is already done is skipped.
-
-Usage:
     python src/transcribe.py --manifest data/manifests/fleurs_en_us.csv
-    python src/transcribe.py --manifest data/manifests/fleurs_el_gr.csv --models small medium
     python src/transcribe.py --manifest data/manifests/stt4sg_gsw.csv --whisper-language de
 
-Output:
-    results/baseline/{model}_{language}.csv
-    columns: id, language, model, hypothesis, avg_logprob, no_speech_prob, seconds, compute_type
+Writes results/baseline/{model}_{language}.csv. Existing files are skipped, never overwritten.
 """
 
 import argparse
@@ -27,12 +20,11 @@ EVAL_DIR = ROOT / "eval_sets"
 MODELS = ["small", "medium", "large-v3"]
 SAMPLE_RATE = 16_000
 
-# Decoding settings, identical for every model and language.
 DECODING = dict(
     task="transcribe",
     beam_size=5,
-    condition_on_previous_text=False,  # utterances are independent sentences
-    vad_filter=False,  # some recordings are very quiet; do not let a VAD drop them
+    condition_on_previous_text=False,
+    vad_filter=False,  # a VAD could drop the very quiet recordings
     without_timestamps=True,
 )
 
@@ -43,9 +35,10 @@ def load_eval_rows(manifest_path: Path) -> pd.DataFrame:
     eval_path = EVAL_DIR / f"{language}.csv"
     if not eval_path.exists():
         raise SystemExit(f"No evaluation set at {eval_path.relative_to(ROOT)}. Run src/select_eval_set.py first.")
-    rows = manifest[manifest["id"].isin(pd.read_csv(eval_path)["id"])]
-    if (rows["audio_path"] == "").any():
-        raise SystemExit("Some evaluation utterances have no audio on disk.")
+    eval_ids = pd.read_csv(eval_path)["id"]
+    rows = manifest[manifest["id"].isin(eval_ids)]
+    if len(rows) != len(eval_ids) or (rows["audio_path"] == "").any():
+        raise SystemExit("Some evaluation utterances are missing from the manifest or have no audio.")
     return rows
 
 
@@ -54,13 +47,14 @@ def transcribe(model: WhisperModel, rows: pd.DataFrame, whisper_language: str, l
     for row in tqdm(rows.itertuples(), total=len(rows), desc=label):
         audio, sample_rate = sf.read(ROOT / row.audio_path, dtype="float32")
         if sample_rate != SAMPLE_RATE or audio.ndim != 1:
-            raise SystemExit(f"{row.audio_path} is not 16 kHz mono; fix it in the manifest step.")
+            raise SystemExit(f"{row.audio_path} is not 16 kHz mono.")
         start = time.perf_counter()
         segments, _ = model.transcribe(audio, language=whisper_language, **DECODING)
         segments = list(segments)
         out.append({
             "id": row.id,
             "hypothesis": " ".join(s.text.strip() for s in segments),
+            # worst segment; utterances under 30 s have exactly one
             "avg_logprob": min((s.avg_logprob for s in segments), default=float("nan")),
             "no_speech_prob": max((s.no_speech_prob for s in segments), default=float("nan")),
             "seconds": round(time.perf_counter() - start, 2),
@@ -72,10 +66,9 @@ def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     parser.add_argument("--manifest", required=True, type=Path)
     parser.add_argument("--models", nargs="+", default=MODELS)
-    parser.add_argument("--whisper-language", help="language code passed to Whisper (default: the manifest language)")
+    parser.add_argument("--whisper-language", help="default: the manifest language")
     parser.add_argument("--device", default="auto", help="auto, cpu or cuda")
-    parser.add_argument("--compute-type", default="default",
-                        help="ctranslate2 compute type; 'default' keeps the model's own precision where the device allows")
+    parser.add_argument("--compute-type", default="default", help="ctranslate2 compute type")
     parser.add_argument("--out-dir", type=Path, default=ROOT / "results" / "baseline")
     args = parser.parse_args()
 
@@ -95,7 +88,7 @@ def main() -> None:
         result.insert(2, "model", name)
         result["compute_type"] = model.model.compute_type
         result.to_csv(out_path, index=False)
-        print(f"wrote {len(result)} rows -> {out_path.relative_to(ROOT)}")
+        print(f"wrote {len(result)} rows -> {out_path}")
         del model
 
 
