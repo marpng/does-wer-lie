@@ -108,7 +108,9 @@ def wer_distribution(utt: pd.DataFrame, normalisation: str) -> pd.DataFrame:
     """How many utterances fall in each WER band: decides whether a WER-stratified rated set is possible."""
     sub = ordered(utt[utt["normalisation"] == normalisation])
     bands = pd.cut(sub["wer"], WER_BINS, labels=WER_BIN_LABELS)
-    return sub.groupby(["language", "model", bands], observed=False).size().unstack(fill_value=0).reset_index()
+    counts = sub.groupby(["language", "model"], observed=True)[[]].size().index
+    table = pd.crosstab([sub["language"], sub["model"]], bands, dropna=False).reindex(counts, fill_value=0)
+    return table.reindex(columns=WER_BIN_LABELS, fill_value=0).reset_index()
 
 
 def main() -> None:

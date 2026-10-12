@@ -26,3 +26,7 @@ __pycache__/
 # Local, not part of the project
 *.pdf
 *.jpeg
+
+# Rating sheets contain audio and reference text
+ratings/sheets/
+ratings/pilot/
