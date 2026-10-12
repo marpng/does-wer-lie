@@ -1,0 +1,8 @@
+# Only needed for LoRA fine-tuning (Q3), intended for Colab
+-r requirements.txt
+torch
+transformers
+datasets
+peft
+accelerate
+evaluate

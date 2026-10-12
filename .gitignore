@@ -1,0 +1,29 @@
+# Data and audio are never committed (size, and the Swiss German licence forbids redistribution)
+data/
+*.wav
+*.mp3
+*.flac
+*.tar.gz
+
+# Models and checkpoints
+models/
+checkpoints/
+*.safetensors
+*.bin
+*.pt
+
+# Python
+.venv/
+__pycache__/
+*.pyc
+.ipynb_checkpoints/
+
+# Editor / OS
+.idea/
+.vscode/
+.DS_Store
+
+# Local, not part of the project
+.claude/
+*.pdf
+*.jpeg
