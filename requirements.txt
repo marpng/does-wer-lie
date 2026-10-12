@@ -9,3 +9,4 @@ soundfile>=0.12
 jiwer>=4.0
 faster-whisper>=1.1
 tqdm>=4.66
+whisper-normalizer>=0.1

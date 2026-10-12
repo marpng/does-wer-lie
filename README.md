@@ -21,9 +21,14 @@ gradient: English, Italian, German, Greek and Swiss German.
 src/                      pipeline scripts
   prepare_fleurs.py       download FLEURS + write manifests
   explore_data.py         data exploration report
+  select_eval_set.py      pick the evaluation set (one recording per sentence)
+  transcribe.py           zero-shot Whisper transcription
+  compute_metrics.py      WER / CER tables
 reports/data_exploration/ generated report (tables, figure, per-file audio checks)
 data/                     NOT committed: raw audio and manifests
-results/                  model outputs and metric tables (to come)
+eval_sets/                IDs of the evaluation utterances per language (fixed)
+results/baseline/         raw model outputs, one file per model and language (never overwritten)
+results/metrics/          per-utterance metrics and result tables
 ratings/                  frozen rated-set IDs and human scores (to come)
 guidelines/               rating guidelines (to come)
 ```
@@ -46,7 +51,21 @@ python src/prepare_fleurs.py --langs it_it de_de          # Linda
 
 # 2. Explore whatever manifests are present
 python src/explore_data.py
+
+# 3. Fix the evaluation set: one recording per unique test sentence, seed 42
+python src/select_eval_set.py --manifest data/manifests/fleurs_en_us.csv
+
+# 4. Transcribe with Whisper small, medium and large-v3 (finished model/language pairs are skipped)
+python src/transcribe.py --manifest data/manifests/fleurs_en_us.csv
+python src/transcribe.py --manifest data/manifests/stt4sg_gsw.csv --whisper-language de   # Swiss German
+
+# 5. WER and CER for everything in results/baseline/
+python src/compute_metrics.py
 ```
+
+Steps 3 and 4 are run once per language. Decoding uses beam size 5, no VAD and no conditioning on
+previous text; the precision actually used is stored in the `compute_type` column of each output
+(float32 on CPU, float16 on a GPU by default).
 
 `prepare_fleurs.py --splits train dev test` also fetches the training audio (about 1.5–2 GB per language).
 
