@@ -5,6 +5,7 @@
 1. Sentence difficulty = WER of the worst model, averaged over the languages in a group.
 2. Sentences are drawn evenly from the difficulty bands.
 3. Per language, each sentence gets the model whose output falls in the least-filled WER band.
+Sentences with brackets in the reference are capped (--max-bracketed).
 
 --parallel languages share the same sentences; the others are sampled independently.
 Writes ratings/rated_set_ids.csv (item_id, language, id, sentence_id, model, overlap), no WER.
@@ -18,6 +19,7 @@ import pandas as pd
 
 ROOT = Path(__file__).resolve().parents[1]
 EVAL_DIR = ROOT / "eval_sets"
+MANIFEST_DIR = ROOT / "data" / "manifests"
 METRICS = ROOT / "results" / "metrics" / "baseline_per_utterance.csv"
 SEED = 42
 BAND_EDGES = [-0.001, 0.0, 0.05, 0.15, 0.30, float("inf")]
@@ -28,15 +30,21 @@ def band(wer: pd.Series) -> pd.Series:
     return pd.cut(wer, BAND_EDGES, labels=BAND_LABELS)
 
 
-def pick_sentences(difficulty: pd.Series, n: int, rng: np.random.Generator) -> list[str]:
+def pick_sentences(difficulty: pd.Series, n: int, bracketed: set, max_bracketed: int, rng: np.random.Generator) -> list[str]:
     """Round-robin over the bands, hardest first, until n sentences are chosen."""
     bands = band(difficulty)
     pools = {b: list(rng.permutation(difficulty.index[bands == b])) for b in BAND_LABELS}
-    chosen = []
+    chosen, n_bracketed = [], 0
     while len(chosen) < n and any(pools.values()):
         for b in reversed(BAND_LABELS):
-            if pools[b] and len(chosen) < n:
-                chosen.append(pools[b].pop())
+            while pools[b] and len(chosen) < n:
+                sentence = pools[b].pop()
+                if sentence in bracketed:
+                    if n_bracketed >= max_bracketed:
+                        continue
+                    n_bracketed += 1
+                chosen.append(sentence)
+                break
     return chosen
 
 
@@ -58,6 +66,8 @@ def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     parser.add_argument("--parallel", nargs="*", default=[], help="languages that share the same sentences")
     parser.add_argument("--per-language", type=int, default=80)
+    parser.add_argument("--max-bracketed", type=int, default=8,
+                        help="cap on sentences whose reference contains brackets (the standard normaliser deletes that text)")
     parser.add_argument("--normalisation", default="standard", help="WER variant used for stratifying")
     parser.add_argument("--overlap-language", help="language whose items are partly rated by both raters")
     parser.add_argument("--overlap-size", type=int, default=30)
@@ -72,6 +82,9 @@ def main() -> None:
     metrics = metrics[metrics["normalisation"] == args.normalisation]
     sentence_of = pd.concat([pd.read_csv(p, dtype=str) for p in EVAL_DIR.glob("*.csv")]).set_index("id")["sentence_id"]
     metrics["sentence_id"] = metrics["id"].map(sentence_of)
+    references = pd.concat([pd.read_csv(p, keep_default_na=False, usecols=["id", "reference_raw"]) for p in MANIFEST_DIR.glob("*.csv")])
+    bracketed_ids = set(references.loc[references["reference_raw"].str.contains(r"[(\[]"), "id"])
+    metrics["bracketed"] = metrics["id"].isin(bracketed_ids)
     languages = sorted(metrics["language"].unique())
     if unknown := set(args.parallel + [args.overlap_language or languages[0]]) - set(languages):
         raise SystemExit(f"No baseline metrics for: {sorted(unknown)}")
@@ -83,7 +96,9 @@ def main() -> None:
         tables = {l: metrics[metrics["language"] == l].pivot(index="sentence_id", columns="model", values="wer").dropna() for l in group}
         shared = sorted(set.intersection(*(set(t.index) for t in tables.values())))
         difficulty = pd.concat([tables[l].loc[shared].max(axis=1) for l in group], axis=1).mean(axis=1)
-        sentences = pick_sentences(difficulty, args.per_language, rng)
+        in_group = metrics[metrics["language"].isin(group)]
+        bracketed = set(in_group.loc[in_group["bracketed"], "sentence_id"])
+        sentences = pick_sentences(difficulty, args.per_language, bracketed, args.max_bracketed, rng)
         if len(sentences) < args.per_language:
             print(f"WARNING {group}: only {len(sentences)} sentences available")
         for language in group:
@@ -115,6 +130,7 @@ def main() -> None:
     report = rated.assign(band=band(lookup.loc[list(zip(rated["language"], rated["sentence_id"], rated["model"])), "wer"].reset_index(drop=True)))
     print(f"wrote {len(rated)} items -> {args.out}\n")
     print("Items per WER band:\n" + report.groupby(["language", "band"], observed=False).size().unstack().to_string())
+    print("\nBracketed references:\n" + rated["id"].isin(bracketed_ids).groupby(rated["language"]).sum().to_string())
     print("\nItems per model:\n" + report.groupby(["language", "model"]).size().unstack(fill_value=0).to_string())
     if args.overlap_language:
         print(f"\nOverlap items ({args.overlap_language}) per WER band:\n" + report[report["overlap"]].groupby("band", observed=False).size().to_string())
