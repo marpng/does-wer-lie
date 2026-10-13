@@ -3,22 +3,19 @@
     python src/compute_metrics.py
     python src/compute_metrics.py --results-dir results/finetuned --name finetuned
 
-Normalisations (applied to reference_raw and hypothesis alike):
-    raw          whitespace only
-    standard     Whisper BasicTextNormalizer
-    standard_en  Whisper EnglishTextNormalizer, English only
+Normalisations are defined in src/normalise.py (raw, standard, standard_en, content).
+Under "content", English words that differ only in how they are split ("tuna fish" / "tunafish") count as correct.
 
 Writes results/metrics/{name}_per_utterance.csv, {name}_table.csv and {name}_table.md.
 """
 
 import argparse
-import unicodedata
 from pathlib import Path
 
 import jiwer
 import pandas as pd
-from whisper_normalizer.basic import BasicTextNormalizer
-from whisper_normalizer.english import EnglishTextNormalizer
+
+from normalise import FORGIVE_SPLITS, clean, normalisers
 
 ROOT = Path(__file__).resolve().parents[1]
 MANIFEST_DIR = ROOT / "data" / "manifests"
@@ -29,29 +26,32 @@ LANG_ORDER = ["en", "it", "de", "el", "gsw"]
 WER_BINS = [-0.001, 0.0, 0.05, 0.15, 0.30, float("inf")]
 WER_BIN_LABELS = ["0", "0–5%", "5–15%", "15–30%", ">30%"]
 
-_basic = BasicTextNormalizer()
-_english = EnglishTextNormalizer()
+def split_only_errors(words: jiwer.WordOutput) -> int:
+    """Errors in stretches where reference and hypothesis are the same letters, split differently."""
+    ref, hyp = words.references[0], words.hypotheses[0]
+    forgiven, run = 0, []
+    for chunk in list(words.alignments[0]) + [None]:
+        if chunk is not None and chunk.type != "equal":
+            run.append(chunk)
+            continue
+        if run:
+            ref_part = "".join(ref[run[0].ref_start_idx:run[-1].ref_end_idx])
+            hyp_part = "".join(hyp[run[0].hyp_start_idx:run[-1].hyp_end_idx])
+            if ref_part == hyp_part:
+                forgiven += sum(max(c.ref_end_idx - c.ref_start_idx, c.hyp_end_idx - c.hyp_start_idx) for c in run)
+            run = []
+    return forgiven
 
 
-def clean(text: str) -> str:
-    """Same Unicode form everywhere, no invisible format characters (zero-width space etc.)."""
-    text = unicodedata.normalize("NFC", text)
-    return "".join(c for c in text if unicodedata.category(c) != "Cf")
-
-
-def normalisers(language: str) -> dict:
-    out = {"raw": lambda text: " ".join(text.split()), "standard": _basic}
-    if language == "en":
-        out["standard_en"] = _english
-    return out
-
-
-def error_counts(reference: str, hypothesis: str) -> dict:
+def error_counts(reference: str, hypothesis: str, forgive_splits: bool = False) -> dict:
     words = jiwer.process_words(reference, hypothesis)
     chars = jiwer.process_characters(reference, hypothesis)
+    word_errors = words.substitutions + words.deletions + words.insertions
+    if forgive_splits:
+        word_errors -= split_only_errors(words)
     return {
         "ref_words": words.hits + words.substitutions + words.deletions,
-        "word_errors": words.substitutions + words.deletions + words.insertions,
+        "word_errors": word_errors,
         "ref_chars": chars.hits + chars.substitutions + chars.deletions,
         "char_errors": chars.substitutions + chars.deletions + chars.insertions,
     }
@@ -75,7 +75,7 @@ def per_utterance(results_dir: Path) -> pd.DataFrame:
             hypothesis = normalise(clean(row.hypothesis)).strip()
             if not reference:
                 continue
-            counts = error_counts(reference, hypothesis)
+            counts = error_counts(reference, hypothesis, forgive_splits=name == "content" and row.language in FORGIVE_SPLITS)
             rows.append({
                 "id": row.id, "language": row.language, "model": row.model, "normalisation": name,
                 **counts,

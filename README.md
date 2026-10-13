@@ -23,6 +23,7 @@ src/                      pipeline scripts
   explore_data.py         data exploration report
   select_eval_set.py      pick the evaluation set (one recording per sentence)
   transcribe.py           zero-shot Whisper transcription
+  normalise.py            text normalisers: raw, standard, content-aware (rules per language)
   compute_metrics.py      WER / CER tables
   sample_rated_set.py     pick the utterances to be rated, stratified by WER
   build_rating_sheet.py   offline HTML rating sheet with audio
