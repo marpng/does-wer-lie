@@ -104,7 +104,7 @@ The `compute_type` column of each output file stores the precision used
 
 ## Fine-tuning runs
 
-All runs use Whisper small, FLEURS Greek train (3,215 recordings, 10 h) and the same seed
+All runs use Whisper small and seed 42, Greek uses FLEURS train (3,215 recordings, 10 h)
 Sentences from the evaluation set, rated set, dev and test splits are never trained on
 Swiss German uses a fixed STT4SG-350 train subset (4,998 recordings with audio, 4,972 after removing held-out sentences, 6.9 h) and a 300-recording dev subset
 `small-lora-gsw` has the same settings as `small-lora-el`, the two other Greek runs are Greek-only experiments
