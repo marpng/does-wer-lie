@@ -1,9 +1,9 @@
 """Human ratings against automatic metrics (Q1 and Q2)
 
     python src/analyse_ratings.py
-    python src/analyse_ratings.py --scores-dir ratings/results --out-dir results/analysis
+    python src/analyse_ratings.py --scores-dir ratings/scores --out-dir results/analysis
 
-Input is ratings/results/*.csv or *.numbers, ratings/rated_set_ids.csv and results/metrics/baseline_per_utterance.csv
+Input is ratings/scores/*.csv or *.numbers, ratings/rated_set_ids.csv and results/metrics/baseline_per_utterance.csv
 Human score of an item is the mean of its raters (0 lost, 1 partly, 2 fully preserved)
 Correlations use human score and minus metric so a positive rho means the metric agrees with humans
 
@@ -391,7 +391,7 @@ def plot_error_categories(out_dir: Path) -> None:
 
 def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
-    parser.add_argument("--scores-dir", type=Path, default=ROOT / "ratings" / "results")
+    parser.add_argument("--scores-dir", type=Path, default=ROOT / "ratings" / "scores")
     parser.add_argument("--ids", type=Path, default=IDS)
     parser.add_argument("--metrics", type=Path, default=METRICS)
     parser.add_argument("--out-dir", type=Path, default=ROOT / "results" / "analysis")

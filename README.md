@@ -106,11 +106,12 @@ reports/data_exploration/  data exploration report
 results/baseline/          zero-shot transcripts, one file per model and language
 results/finetuned/         transcripts of the fine-tuned models
 results/metrics/           per-utterance metrics and result tables
+results/analysis/          Q1 and Q2 agreement and correlations for all languages
 results/analysis_q3/       Q3 gains and error types for small-lora-el
 results/analysis_q3_all/   same for small-lora-el-all
 results/analysis_q3_reg/   same for small-lora-el-reg
 ratings/rated_set_ids.csv  frozen list of rated items
-ratings/results/           downloaded human ratings, one file per language and rater
+ratings/scores/           downloaded human ratings, one file per language and rater
 data/                      not committed, audio and manifests
 models/                    not committed, adapters and converted models
 ratings/sheets/            not committed, rating sheets with audio

@@ -5,7 +5,7 @@ The sheet shows no model name and no WER
     python src/build_rating_sheet.py --language en --overlap-only
 
 Writes ratings/sheets/{name}/index.html and audio/ (not committed)
-Raters open it in a browser, press Download CSV and the file goes to ratings/results/
+Raters open it in a browser, press Download CSV and the file goes to ratings/scores/
 """
 
 import argparse
