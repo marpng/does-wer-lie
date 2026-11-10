@@ -138,10 +138,10 @@ One CSV per language in `data/manifests/` with 16 kHz mono audio
 Full numbers are in `reports/data_exploration/summary.md`
 
 - Test sets have about 650 recordings but only 350 (EN) and 333 (EL) unique sentences
-- Utterances are uniform, median 9.5 s and 21 words (EN), 10.1 s and 22 words (EL)
+- Test recordings are uniform, median 9.5 s and 21 words (EN), 10.1 s and 22 words (EL)
 - About 70% of English recordings are very quiet, so audio is peak normalised for raters
 - The FLEURS normalised transcript still has digits and punctuation, so always start from `reference_raw`
-- About 20% of utterances contain digits and 9% of Greek ones contain Latin words, which cause WER errors that are not meaning errors
+- About 19% (EN) and 20% (EL) of test utterances contain digits and 9% of Greek ones contain Latin words, which cause WER errors that are not meaning errors
 
 ## Data licences
 
