@@ -98,7 +98,7 @@ python src/transcribe.py --manifest data/manifests/stt4sg_gsw.csv --whisper-lang
 python src/compute_metrics.py --results-dir results/finetuned --name finetuned
 python src/analyse_finetuning.py --language gsw --tuned small-lora-gsw --out-dir results/analysis_q3_gsw
 python src/analyse_error_types.py --language gsw --baseline small --tuned small-lora-gsw --manifest data/manifests/stt4sg_gsw.csv --out-dir results/analysis_q3_gsw
-
+```
 Decoding uses beam size 5, no VAD and no conditioning on previous text
 The `compute_type` column of each output file stores the precision used
 
