@@ -83,6 +83,22 @@ python src/analyse_error_types.py --language el --baseline small --tuned small-l
 Decoding uses beam size 5, no VAD and no conditioning on previous text
 The `compute_type` column of each output file stores the precision used
 
+## Utterances per language
+
+The unit of work is the utterance, one recording of one sentence
+
+| Language | Source | Utterances transcribed and scored | Utterances rated by humans |
+|---|---|---|---|
+| English | FLEURS | 350 | 80 (30 rated by both raters) |
+| Italian | FLEURS | 346 | 80 |
+| German | FLEURS | 347 | 80 |
+| Greek | FLEURS | 333 | 80 |
+| Swiss German | STT4SG-350 | 3,515 | 80 |
+
+For FLEURS this is one recording per unique test sentence
+Each rated item is one utterance with the output of one model, chosen by WER band
+Fine-tuning for Greek uses 3,215 training utterances (10 h)
+
 ## Fine-tuning runs
 
 All runs use Whisper small, FLEURS Greek train (3,215 recordings, 10 h) and the same seed
@@ -146,5 +162,5 @@ Full numbers are in `reports/data_exploration/summary.md`
 ## Data licences
 
 FLEURS is CC BY 4.0
-STT4SG-350 and SDS-200 need a signed licence and must not be redistributed
-For Swiss German this repository only holds IDs, model outputs and ratings, never audio or reference text
+The Swiss German data (STT4SG-350 and SDS-200) comes from SwissNLP and we use it under their licence
+It is not redistributed here, so for Swiss German the repository only holds IDs, model outputs and ratings, never audio or reference text
