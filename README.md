@@ -13,7 +13,7 @@ English, Italian, German, Greek and Swiss German
 - Q2 Does the correlation get worse down the resource ladder, especially for Swiss German
 - Q3 After LoRA fine-tuning a small Whisper, does the WER gain hold up or is it partly cosmetic
 
-For Q3 we fine-tune on Greek and compare WER and CER before and after under different normalisations
+For Q3 we fine-tune on Greek and Swiss German and compare WER and CER before and after under different normalisations
 There is no second human rating round for Q3
 
 ## Setup
@@ -40,7 +40,7 @@ All scripts are in `src/` and run from the repository root
 | `explore_data.py` | writes the data exploration report |
 | `select_eval_set.py` | picks the evaluation set, one recording per test sentence |
 | `transcribe.py` | transcribes the evaluation set with Whisper small, medium and large-v3 or with a fine-tuned model |
-| `normalise.py` | text normalisers used for scoring (raw, standard, standard_en, content) |
+| `normalise.py` | text normalisers used for scoring (raw, standard, standard_en, content), content rules for en, el, de, it and gsw |
 | `compute_metrics.py` | WER and CER per utterance and as tables |
 | `sample_rated_set.py` | samples the items humans rate, stratified by WER |
 | `build_rating_sheet.py` | builds an offline HTML rating sheet with audio |
@@ -83,7 +83,7 @@ python src/build_rating_sheet.py --language de
 python src/build_rating_sheet.py --language gsw
 python src/analyse_ratings.py
 
-# 5 fine-tuning (Q3) 
+# 5a fine-tuning Greek (Q3) 
 python src/prepare_fleurs.py --langs el_gr --splits train dev test
 python src/finetune_lora.py --manifest data/manifests/fleurs_el_gr.csv --name small-lora-el
 python src/transcribe.py --manifest data/manifests/fleurs_el_gr.csv --models small-lora-el=models/small-lora-el/ct2 --out-dir results/finetuned
@@ -91,14 +91,14 @@ python src/compute_metrics.py --results-dir results/finetuned --name finetuned
 python src/analyse_finetuning.py --language el --tuned small-lora-el
 python src/analyse_error_types.py --language el --baseline small --tuned small-lora-el
 
-
-# 5b fine-tuning Swiss German
+# 5b fine-tuning Swiss German (Q3)
 python src/finetune_lora.py --manifest data/manifests/stt4sg_gsw.csv --whisper-language de --name small-lora-gsw
 python src/transcribe.py --manifest data/manifests/stt4sg_gsw.csv --whisper-language de --models small-lora-gsw=models/small-lora-gsw/ct2 --out-dir results/finetuned
 python src/compute_metrics.py --results-dir results/finetuned --name finetuned
 python src/analyse_finetuning.py --language gsw --tuned small-lora-gsw --out-dir results/analysis_q3_gsw
 python src/analyse_error_types.py --language gsw --baseline small --tuned small-lora-gsw --manifest data/manifests/stt4sg_gsw.csv --out-dir results/analysis_q3_gsw
 ```
+
 Decoding uses beam size 5, no VAD and no conditioning on previous text
 The `compute_type` column of each output file stores the precision used
 
@@ -120,7 +120,7 @@ Swiss German uses a fixed STT4SG-350 train subset (4,998 recordings with audio, 
 
 ```
 src/                       scripts
-notebooks/                 Colab notebooks for the three fine-tuning runs
+notebooks/                 Colab notebooks for the fine-tuning runs
 eval_sets/                 IDs of the evaluation utterances per language
 reports/data_exploration/  data exploration report
 results/baseline/          zero-shot transcripts, one file per model and language
@@ -130,8 +130,9 @@ results/analysis/          Q1 and Q2 agreement and correlations for all language
 results/analysis_q3/       Q3 gains and error types for small-lora-el
 results/analysis_q3_all/   same for small-lora-el-all
 results/analysis_q3_reg/   same for small-lora-el-reg
+results/analysis_q3_gsw/   same for small-lora-gsw 
 ratings/rated_set_ids.csv  frozen list of rated items
-ratings/scores/           downloaded human ratings, one file per language and rater
+ratings/scores/            downloaded human ratings, one file per language and rater
 data/                      not committed, audio and manifests
 models/                    not committed, adapters and converted models
 ratings/sheets/            not committed, rating sheets with audio
@@ -150,7 +151,7 @@ One CSV per language in `data/manifests/` with 16 kHz mono audio
 | `reference_raw` | reference as published with case and punctuation |
 | `reference` | the corpus own lowercased version |
 | `duration` | seconds |
-| `sentence_id` | ID of the read sentence, shared across FLEURS languages |
+| `sentence_id` | ID of the read sentence, shared across FLEURS languages (Swiss German: STT4SG sentence ID, or a hash of the text where missing) |
 | `gender`, `dialect` | speaker metadata where available |
 
 ## Data notes
@@ -162,12 +163,16 @@ Full numbers are in `reports/data_exploration/summary.md`
 - About 70% of English recordings are very quiet, so audio is peak normalised for raters
 - The FLEURS normalised transcript still has digits and punctuation, so always start from `reference_raw`
 - About 19% (EN) and 20% (EL) of test utterances contain digits and 9% of Greek ones contain Latin words, which cause WER errors that are not meaning errors
+- German and Italian test sets have 347 and 346 unique sentences, about 19% of utterances contain digits and about 17% words in brackets
+- The FLEURS German test set has only male speakers and the Italian one almost only female speakers
+- The STT4SG-350 test split reads each of its 3,515 sentences once in each of the 7 dialect regions (24,605 recordings)
+- The Swiss German evaluation set keeps one recording per sentence (3,515), about 502 per region, it contains the 350-sentence subset the rated items come from
+- Overview counts for Swiss German refer to the full STT4SG-350 splits, the evaluation set is `eval_sets/gsw.csv`
+- Swiss German references are Standard German translations, not transcripts of the dialect
 
 ## Data licences
 
 FLEURS is CC BY 4.0
-The Swiss German data (STT4SG-350 and SDS-200) comes from SwissNLP and we use it under their licence
-It is not redistributed here, so for Swiss German the repository only holds IDs, model outputs and ratings, never audio or reference text
 
 STT4SG-350 (Plüss et al., 2023) is distributed by SwissNLP under the META-SHARE NonCommercial NoRedistribution licence
 It may be used for non-commercial research but not redistributed, request it from SwissNLP (https://swissnlp.org/datasets/)
