@@ -83,22 +83,6 @@ python src/analyse_error_types.py --language el --baseline small --tuned small-l
 Decoding uses beam size 5, no VAD and no conditioning on previous text
 The `compute_type` column of each output file stores the precision used
 
-## Utterances per language
-
-The unit of work is the utterance, one recording of one sentence
-
-| Language | Source | Evaluation utterances (transcribed and scored) | Rated items | Raters per item |
-|---|---|---|---|---|
-| English | FLEURS | 350 | 80 | 2 (BD, ICRC) |
-| Italian | FLEURS | 346 | 80 | 2 (AN, GM) |
-| German | FLEURS | 347 | 80 | 2 (CM, KH) |
-| Greek | FLEURS | 333 | 80 | 2 (EG, MP) |
-| Swiss German | STT4SG-350 | 3,515 | 80 | 2 (JH, JM) |
-
-For FLEURS the evaluation set is one recording per unique test sentence, out of 647 English and 650 Greek test recordings
-Both raters of a language scored the same 80 items, each item being one utterance with the output of one model
-Fine-tuning for Greek used 3,215 training utterances (10 h), which are separate from the evaluation set
-
 ## Fine-tuning runs
 
 All runs use Whisper small, FLEURS Greek train (3,215 recordings, 10 h) and the same seed
