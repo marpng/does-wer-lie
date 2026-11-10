@@ -35,6 +35,8 @@ All scripts are in `src/` and run from the repository root
 | Script | What it does |
 |---|---|
 | `prepare_fleurs.py` | downloads FLEURS and writes one manifest per language |
+| `prepare_stt4sg.py` | writes the Swiss German manifest from a local copy of STT4SG-350 and draws the fixed subsets |
+| `swiss_german.py` | subset selection and 16 kHz conversion used by `prepare_stt4sg.py` |
 | `explore_data.py` | writes the data exploration report |
 | `select_eval_set.py` | picks the evaluation set, one recording per test sentence |
 | `transcribe.py` | transcribes the evaluation set with Whisper small, medium and large-v3 or with a fine-tuned model |
@@ -53,32 +55,49 @@ All scripts are in `src/` and run from the repository root
 
 ```bash
 # 1 data and manifests
-python src/prepare_fleurs.py --langs en_us el_gr
+python src/prepare_fleurs.py --langs en_us el_gr it_it de_de
+python src/prepare_stt4sg.py --stt4sg-dir path/to/STT4SG-350 --test-size 5000 --train-size 5000 --dev-size 300
 python src/explore_data.py
 
 # 2 fixed evaluation set per language
 python src/select_eval_set.py --manifest data/manifests/fleurs_en_us.csv
 python src/select_eval_set.py --manifest data/manifests/fleurs_el_gr.csv
+python src/select_eval_set.py --manifest data/manifests/fleurs_it_it.csv
+python src/select_eval_set.py --manifest data/manifests/fleurs_de_de.csv
+python src/select_eval_set.py --manifest data/manifests/stt4sg_gsw.csv
 
-# 3 zero-shot transcription and metrics
+# 3 zero-shot transcription and metrics (Swiss German is decoded as German, Whisper has no gsw)
 python src/transcribe.py --manifest data/manifests/fleurs_en_us.csv
 python src/transcribe.py --manifest data/manifests/fleurs_el_gr.csv
+python src/transcribe.py --manifest data/manifests/fleurs_it_it.csv
+python src/transcribe.py --manifest data/manifests/fleurs_de_de.csv
+python src/transcribe.py --manifest data/manifests/stt4sg_gsw.csv --whisper-language de
 python src/compute_metrics.py
 
 # 4 human rating (run the sampling once, the file is frozen)
 python src/sample_rated_set.py --parallel en it de el --overlap-language en --overlap-size 30
 python src/build_rating_sheet.py --language el
 python src/build_rating_sheet.py --language en --overlap-only
+python src/build_rating_sheet.py --language it
+python src/build_rating_sheet.py --language de
+python src/build_rating_sheet.py --language gsw
 python src/analyse_ratings.py
 
-# 5 fine-tuning (Q3)
+# 5 fine-tuning (Q3) 
 python src/prepare_fleurs.py --langs el_gr --splits train dev test
 python src/finetune_lora.py --manifest data/manifests/fleurs_el_gr.csv --name small-lora-el
 python src/transcribe.py --manifest data/manifests/fleurs_el_gr.csv --models small-lora-el=models/small-lora-el/ct2 --out-dir results/finetuned
 python src/compute_metrics.py --results-dir results/finetuned --name finetuned
 python src/analyse_finetuning.py --language el --tuned small-lora-el
 python src/analyse_error_types.py --language el --baseline small --tuned small-lora-el
-```
+
+
+# 5b fine-tuning Swiss German
+python src/finetune_lora.py --manifest data/manifests/stt4sg_gsw.csv --whisper-language de --name small-lora-gsw
+python src/transcribe.py --manifest data/manifests/stt4sg_gsw.csv --whisper-language de --models small-lora-gsw=models/small-lora-gsw/ct2 --out-dir results/finetuned
+python src/compute_metrics.py --results-dir results/finetuned --name finetuned
+python src/analyse_finetuning.py --language gsw --tuned small-lora-gsw --out-dir results/analysis_q3_gsw
+python src/analyse_error_types.py --language gsw --baseline small --tuned small-lora-gsw --manifest data/manifests/stt4sg_gsw.csv --out-dir results/analysis_q3_gsw
 
 Decoding uses beam size 5, no VAD and no conditioning on previous text
 The `compute_type` column of each output file stores the precision used
@@ -87,14 +106,15 @@ The `compute_type` column of each output file stores the precision used
 
 All runs use Whisper small, FLEURS Greek train (3,215 recordings, 10 h) and the same seed
 Sentences from the evaluation set, rated set, dev and test splits are never trained on
+Swiss German uses a fixed STT4SG-350 train subset (4,998 recordings with audio, 4,972 after removing held-out sentences, 6.9 h) and a 300-recording dev subset
+`small-lora-gsw` has the same settings as `small-lora-el`, the two other Greek runs are Greek-only experiments
 
-| Run | LoRA layers | Epochs | Learning rate | SpecAugment | Notebook |
-|---|---|---|---|---|---|
-| `small-lora-el` | q and v | 3 | 5e-4 | no | `finetune_colab.ipynb` |
-| `small-lora-el-all` | all linear | 3 | 5e-4 | no | `finetune_colab_all_linear.ipynb` |
-| `small-lora-el-reg` | q and v | 2 | 2e-4 | yes | `finetune_colab_sensitivity.ipynb` |
-
-Summary of all runs is in `results/metrics/finetuning_summary.md`
+| Run | Language | LoRA layers | Epochs | Learning rate | SpecAugment | Notebook |
+|---|---|---|---|---|---|---|
+| `small-lora-el` | el | q and v | 3 | 5e-4 | no | `finetune_colab.ipynb` |
+| `small-lora-el-all` | el | all linear | 3 | 5e-4 | no | `finetune_colab_all_linear.ipynb` |
+| `small-lora-el-reg` | el | q and v | 2 | 2e-4 | yes | `finetune_colab_sensitivity.ipynb` |
+| `small-lora-gsw` | gsw | q and v | 3 | 5e-4 | no | `finetune_colab_gsw.ipynb` |
 
 ## Repository layout
 
@@ -148,3 +168,9 @@ Full numbers are in `reports/data_exploration/summary.md`
 FLEURS is CC BY 4.0
 The Swiss German data (STT4SG-350 and SDS-200) comes from SwissNLP and we use it under their licence
 It is not redistributed here, so for Swiss German the repository only holds IDs, model outputs and ratings, never audio or reference text
+
+STT4SG-350 (Plüss et al., 2023) is distributed by SwissNLP under the META-SHARE NonCommercial NoRedistribution licence
+It may be used for non-commercial research but not redistributed, request it from SwissNLP (https://swissnlp.org/datasets/)
+For Swiss German the repository therefore only holds clip IDs, model outputs, metrics and ratings, never audio or reference text
+`src/prepare_stt4sg.py` rebuilds the same evaluation set from the corpus files (seed 42)
+SDS-200 was considered but not used
