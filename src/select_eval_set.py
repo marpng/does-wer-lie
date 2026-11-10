@@ -1,8 +1,9 @@
-"""Pick the evaluation set: one recording per unique sentence, gender-balanced where possible.
+"""Pick the evaluation set: one recording per unique test sentence, gender balanced where possible
 
     python src/select_eval_set.py --manifest data/manifests/fleurs_en_us.csv
 
-Writes eval_sets/{language}.csv (id, sentence_id). The file is meant to stay fixed.
+Writes eval_sets/{language}.csv with id and sentence_id
+Keep this file fixed once chosen
 """
 
 import argparse
@@ -19,7 +20,7 @@ def select(manifest: pd.DataFrame) -> pd.DataFrame:
     shuffled = manifest.sample(frac=1, random_state=SEED)
     counts = {g: 0 for g in shuffled["gender"].unique()}
     chosen = []
-    # Single-gender sentences first: they leave no choice.
+    # Single gender sentences first since they leave no choice
     groups = sorted(shuffled.groupby("sentence_id", sort=False), key=lambda kv: kv[1]["gender"].nunique())
     for _, recordings in groups:
         pick = min(recordings.itertuples(), key=lambda r: counts[r.gender])
@@ -39,7 +40,7 @@ def main() -> None:
     manifest = manifest[(manifest["split"] == args.split) & (manifest["audio_path"] != "")].copy()
     if manifest.empty:
         raise SystemExit(f"No '{args.split}' rows with audio in {args.manifest}.")
-    # Datasets without sentence IDs: every recording is its own sentence.
+    # Without sentence IDs every recording is its own sentence
     no_sentence = manifest["sentence_id"] == ""
     manifest.loc[no_sentence, "sentence_id"] = manifest.loc[no_sentence, "id"]
     language = manifest["language"].iloc[0]

@@ -1,12 +1,12 @@
-"""WER and CER for every transcription file in a results directory.
+"""WER and CER for every transcription file in a results directory
 
     python src/compute_metrics.py
     python src/compute_metrics.py --results-dir results/finetuned --name finetuned
 
-Normalisations are defined in src/normalise.py (raw, standard, standard_en, content).
-Under "content", English words that differ only in how they are split ("tuna fish" / "tunafish") count as correct.
+Normalisations are defined in src/normalise.py
+Under content, English words that differ only in splitting ("tuna fish" and "tunafish") count as correct
 
-Writes results/metrics/{name}_per_utterance.csv, {name}_table.csv and {name}_table.md.
+Writes results/metrics/{name}_per_utterance.csv, {name}_table.csv and {name}_table.md
 """
 
 import argparse
@@ -27,7 +27,7 @@ WER_BINS = [-0.001, 0.0, 0.05, 0.15, 0.30, float("inf")]
 WER_BIN_LABELS = ["0", "0–5%", "5–15%", "15–30%", ">30%"]
 
 def split_only_errors(words: jiwer.WordOutput) -> int:
-    """Errors in stretches where reference and hypothesis are the same letters, split differently."""
+    """Errors where reference and hypothesis have the same letters split differently"""
     ref, hyp = words.references[0], words.hypotheses[0]
     forgiven, run = 0, []
     for chunk in list(words.alignments[0]) + [None]:
@@ -108,7 +108,7 @@ def corpus_table(utt: pd.DataFrame) -> pd.DataFrame:
 
 
 def wer_distribution(utt: pd.DataFrame, normalisation: str) -> pd.DataFrame:
-    """Utterances per WER band."""
+    """Utterances per WER band"""
     sub = ordered(utt[utt["normalisation"] == normalisation])
     bands = pd.cut(sub["wer"], WER_BINS, labels=WER_BIN_LABELS)
     counts = sub.groupby(["language", "model"], observed=True)[[]].size().index

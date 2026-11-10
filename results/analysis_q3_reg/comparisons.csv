@@ -1,0 +1,3 @@
+subset,comparison,estimate,ci_low,ci_high,excludes_zero
+eval_set,"WER reduction, content minus raw",0.011125598677370507,7.629827842147182e-05,0.023104556892680386,True
+eval_set,"WER reduction, content minus standard",0.010206650054116695,0.004171039877159294,0.017267160461978327,True

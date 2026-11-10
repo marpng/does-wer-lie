@@ -30,3 +30,15 @@ __pycache__/
 # Rating sheets contain audio and reference text
 ratings/sheets/
 ratings/pilot/
+
+# Upload bundle for Colab
+notebooks/colab_package.zip
+
+# Local bundles and scratch
+notebooks/*.zip
+data_package/
+data_package.zip
+commands.tex
+Diary.md
+results_package.zip
+src.zip

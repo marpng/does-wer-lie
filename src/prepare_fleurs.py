@@ -1,10 +1,10 @@
-"""Download FLEURS and write one manifest per language.
+"""Download FLEURS and write one manifest per language
 
     python src/prepare_fleurs.py --langs en_us el_gr
-    python src/prepare_fleurs.py --langs el_gr --splits train dev test   # train audio is ~2 GB
+    python src/prepare_fleurs.py --langs el_gr --splits train dev test
 
-Writes data/raw/fleurs/{lang}/ and data/manifests/fleurs_{lang}.csv.
-Splits not listed in --splits get transcript rows with an empty audio_path.
+Writes data/raw/fleurs/{lang}/ and data/manifests/fleurs_{lang}.csv
+Splits not in --splits get transcript rows with an empty audio_path
 """
 
 import argparse
@@ -19,7 +19,7 @@ REPO = "google/fleurs"
 ROOT = Path(__file__).resolve().parents[1]
 RAW_DIR = ROOT / "data" / "raw" / "fleurs"
 MANIFEST_DIR = ROOT / "data" / "manifests"
-SAMPLE_RATE = 16_000  # FLEURS audio is already 16 kHz mono
+SAMPLE_RATE = 16_000  # FLEURS audio is 16 kHz mono
 
 TSV_COLUMNS = ["sentence_id", "file_name", "reference_raw", "reference", "chars", "num_samples", "gender"]
 MANIFEST_COLUMNS = [
@@ -33,7 +33,7 @@ def fetch(lang: str, filename: str) -> Path:
 
 
 def read_tsv(path: Path) -> pd.DataFrame:
-    # No header; transcripts contain stray quote characters.
+    # No header and transcripts contain stray quote characters
     return pd.read_csv(path, sep="\t", header=None, names=TSV_COLUMNS, quoting=csv.QUOTE_NONE, dtype=str)
 
 

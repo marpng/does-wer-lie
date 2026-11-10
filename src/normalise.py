@@ -1,14 +1,17 @@
-"""Text normalisers used for scoring. Reference and hypothesis always go through the same one.
+"""Text normalisers for scoring
+Reference and hypothesis always go through the same one
 
     raw          whitespace only
     standard     Whisper BasicTextNormalizer
     standard_en  Whisper EnglishTextNormalizer (English only)
-    content      language-specific rules that only erase differences a reader would not call an error
+    content      language rules that only remove differences a reader would not call an error
 
-Content rules, all languages: words inside brackets are kept (the Whisper normalisers delete them).
-English: EnglishTextNormalizer plus unit abbreviations.
-Greek:   accents and final sigma are kept. Number words, digits and ordinals are unified,
-         a few abbreviations are expanded, Latin look-alike letters inside Greek words are fixed.
+Content rules for all languages: words in brackets are kept
+English: EnglishTextNormalizer plus unit abbreviations
+Greek: accents and final sigma are kept
+       number words digits and ordinals are unified
+       a few abbreviations are expanded
+       Latin look-alike letters inside Greek words are fixed
 """
 
 import re
@@ -22,7 +25,7 @@ _english = EnglishTextNormalizer()
 
 
 def clean(text: str) -> str:
-    """Same Unicode form everywhere, no invisible format characters (zero-width space etc.)."""
+    """Same Unicode form everywhere and no invisible format characters"""
     text = unicodedata.normalize("NFC", text)
     return "".join(c for c in text if unicodedata.category(c) != "Cf")
 
@@ -49,11 +52,11 @@ def content_en(text: str) -> str:
 
 # ---------------------------------------------------------------- Greek
 
-# Latin capitals that look like Greek ones; fixed only inside otherwise-Greek words or as a lone article.
+# Latin capitals that look like Greek ones, fixed only inside Greek words or as a lone article
 _HOMOGLYPHS = str.maketrans("ABEHIKMNOPTXYZ", "ΑΒΕΗΙΚΜΝΟΡΤΧΥΖ")
 _GREEK = re.compile(r"[Ͱ-Ͽἀ-῿]")
 
-# Applied before lowercasing: "π.Χ." (BC) and "π.χ." (e.g.) differ only in case.
+# Applied before lowercasing because "π.Χ." (BC) and "π.χ." (e.g.) differ only in case
 _EL_ABBREVIATIONS = [
     (r"\bπ\.\s?Χ\.?", " προχριστού "), (r"\bπρο\s+Χριστού\b", " προχριστού "),
     (r"\bμ\.\s?Χ\.?", " μεταχριστόν "), (r"\bμετά\s+Χριστόν?\b", " μεταχριστόν "),
@@ -61,7 +64,7 @@ _EL_ABBREVIATIONS = [
     (r"%", " τοιςεκατό "), (r"\bτοις\s+εκατό\b", " τοιςεκατό "),
 ]
 
-_ONE = {"ένα", "ένας", "έναν", "μία", "μια", "ενός", "μιας"}  # also the indefinite article: only inside a number
+_ONE = {"ένα", "ένας", "έναν", "μία", "μια", "ενός", "μιας"}  # also the indefinite article so only inside a number
 _CARDINALS = {
     2: "δύο δυο", 3: "τρεις τρία τριών", 4: "τέσσερις τέσσερα τεσσάρων", 5: "πέντε", 6: "έξι",
     7: "επτά εφτά", 8: "οκτώ οχτώ", 9: "εννέα εννιά", 10: "δέκα", 11: "έντεκα ένδεκα", 12: "δώδεκα",
@@ -70,7 +73,7 @@ _CARDINALS = {
     20: "είκοσι", 30: "τριάντα", 40: "σαράντα", 50: "πενήντα", 60: "εξήντα", 70: "εβδομήντα",
     80: "ογδόντα", 90: "ενενήντα", 100: "εκατό εκατόν", 1000: "χίλια χίλιοι χίλιες χίλιους χιλίων",
 }
-_HUNDREDS = {  # stressed stem, unstressed stem (genitive plural shifts the accent)
+_HUNDREDS = {  # stressed stem and unstressed stem
     200: [("διακόσι", "διακοσ")], 300: [("τριακόσι", "τριακοσ")], 400: [("τετρακόσι", "τετρακοσ")],
     500: [("πεντακόσι", "πεντακοσ")], 600: [("εξακόσι", "εξακοσ")],
     700: [("επτακόσι", "επτακοσ"), ("εφτακόσι", "εφτακοσ")],
@@ -118,10 +121,10 @@ def _magnitude(value: int) -> int:
 
 
 def _numbers_to_digits(tokens: list[str]) -> list[str]:
-    """Greek number words -> digits ("δέκα χιλιάδες" -> "10000"); ordinals -> "<n>ο" ("δέκατη πέμπτη" -> "15ο")."""
+    """Greek number words to digits ("δέκα χιλιάδες" to "10000") and ordinals to "<n>ο" ("δέκατη πέμπτη" to "15ο")"""
     out, i = [], 0
     while i < len(tokens):
-        # ordinals: a tens ordinal may be followed by a units ordinal
+        # ordinals, a tens ordinal may be followed by a units ordinal
         if tokens[i] in ORDINAL:
             value = ORDINAL[tokens[i]]
             if value >= 10 and value % 10 == 0 and i + 1 < len(tokens) and ORDINAL.get(tokens[i + 1], 99) < 10:
@@ -135,7 +138,7 @@ def _numbers_to_digits(tokens: list[str]) -> list[str]:
             i += 1
             continue
 
-        # cardinals: add up a run of number words, e.g. 2 x 1000 + 500 + 30 + 1
+        # cardinals, add up a run of number words
         total, current, parts, j = 0, 0, 0, i
         while j < len(tokens):
             token = tokens[j]
@@ -173,8 +176,8 @@ def content_el(text: str) -> str:
 # ---------------------------------------------------------------- registry
 
 CONTENT = {"en": content_en, "el": content_el}
-# Languages where "tuna fish" / "tunafish" counts as correct. Not Greek: there a moved word
-# boundary usually gives a different word ("τον αέρα" / "το ναέρα").
+# Languages where "tuna fish" and "tunafish" count as correct
+# Not Greek because a moved word boundary there usually gives a different word
 FORGIVE_SPLITS = {"en"}
 
 

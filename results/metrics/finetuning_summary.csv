@@ -1,0 +1,5 @@
+model,lora_targets,trainable_params_M,epochs,lr,spec_augment,train_min,dev_wer_final,wer_raw,wer_standard,wer_content,cer_raw,cer_standard,cer_content
+small (baseline),,,,,,,34.0,36.04,33.06,30.87,12.44,12.78,10.75
+small-lora-el,"q_proj,v_proj",3.5,3,5e-4,no,24.5,29.3,31.03,27.85,25.67,10.04,10.57,8.68
+small-lora-el-all,"q,k,v,out_proj,fc1,fc2",13.0,3,5e-4,no,32.0,26.9,27.67,24.42,22.25,9.11,9.66,7.74
+small-lora-el-reg,"q_proj,v_proj",3.5,2,2e-4,yes,16.1,31.4,31.97,29.30,27.04,10.65,11.18,9.16

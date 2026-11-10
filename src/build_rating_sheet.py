@@ -1,10 +1,11 @@
-"""Build an offline rating sheet for one language: audio, reference, model output. No model name, no WER.
+"""Build an offline rating sheet for one language with audio, reference and model output
+The sheet shows no model name and no WER
 
     python src/build_rating_sheet.py --language el
     python src/build_rating_sheet.py --language en --overlap-only
 
-Writes ratings/sheets/{name}/index.html and audio/ (peak-normalised). Not committed.
-Rate in a browser, press "Download CSV", save the file to ratings/scores/.
+Writes ratings/sheets/{name}/index.html and audio/ (not committed)
+Raters open it in a browser, press Download CSV and the file goes to ratings/results/
 """
 
 import argparse
@@ -52,7 +53,7 @@ def main() -> None:
     parser.add_argument("--language", required=True)
     parser.add_argument("--items", type=Path, default=ROOT / "ratings" / "rated_set_ids.csv")
     parser.add_argument("--overlap-only", action="store_true")
-    parser.add_argument("--name", help="sheet folder name (default: {language} or {language}_overlap)")
+    parser.add_argument("--name", help="sheet folder name, default is the language or language_overlap")
     args = parser.parse_args()
 
     items = load_items(args.items, args.language, args.overlap_only)

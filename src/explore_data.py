@@ -1,9 +1,9 @@
-"""Explore all manifests: size, durations, text properties, audio health.
+"""Explore all manifests: size, durations, text properties, audio health
 
     python src/explore_data.py
-    python src/explore_data.py --no-audio      # skip the slower audio checks
+    python src/explore_data.py --no-audio
 
-Writes reports/data_exploration/.
+Writes reports/data_exploration/
 """
 
 import argparse
@@ -23,14 +23,14 @@ ROOT = Path(__file__).resolve().parents[1]
 MANIFEST_DIR = ROOT / "data" / "manifests"
 OUT_DIR = ROOT / "reports" / "data_exploration"
 
-# One fixed colour per language across all figures.
+# One fixed colour per language in all figures
 LANG_COLORS = {"en": "#2a78d6", "el": "#eb6834", "it": "#1baf7a", "de": "#eda100", "gsw": "#e87ba4"}
 INK, MUTED, GRID, SURFACE = "#0b0b0b", "#52514e", "#e4e3df", "#fcfcfb"
 
 SEED = 42
 N_UTTERANCES = 500
-QUIET_RMS_DB = -50.0  # low recording gain, speech still present
-NO_SPEECH_RANGE_DB = 10.0  # loud-vs-quiet frame spread below this: no speech
+QUIET_RMS_DB = -50.0  # low gain but speech present
+NO_SPEECH_RANGE_DB = 10.0  # frame spread below this means no speech
 CLIP_PEAK = 0.999
 FRAME = 400  # 25 ms at 16 kHz
 
@@ -55,7 +55,7 @@ def script_of(token: str) -> str:
 
 
 def text_flags(df: pd.DataFrame) -> pd.DataFrame:
-    """Per-utterance flags for content whose WER depends on normalisation."""
+    """Per utterance flags for content where WER depends on normalisation"""
     raw, norm = df["reference_raw"], df["reference"]
     flags = pd.DataFrame(index=df.index)
     flags["has_digit"] = raw.str.contains(r"\d")
@@ -96,7 +96,7 @@ def gender_table(df: pd.DataFrame) -> pd.DataFrame:
 
 
 def split_leakage(df: pd.DataFrame) -> pd.DataFrame:
-    """Sentences shared between splits."""
+    """Sentences shared between splits"""
     rows = []
     for lang, d in df.groupby("language", sort=False):
         sets = {s: set(x["sentence_id"]) for s, x in d.groupby("split")}
@@ -107,7 +107,7 @@ def split_leakage(df: pd.DataFrame) -> pd.DataFrame:
 
 
 def parallel_coverage(df: pd.DataFrame, split: str) -> pd.DataFrame:
-    """Sentences shared across FLEURS languages."""
+    """Sentences shared across languages"""
     sets = {lang: set(d["sentence_id"]) for lang, d in df[(df["split"] == split) & (df["dataset"] == "fleurs")].groupby("language", sort=False)}
     langs = list(sets)
     rows = [{"languages": lang, "sentences": len(sets[lang])} for lang in langs]
@@ -117,7 +117,7 @@ def parallel_coverage(df: pd.DataFrame, split: str) -> pd.DataFrame:
 
 
 def frame_dynamic_range(mono: np.ndarray) -> float:
-    """dB spread between loud (p95) and quiet (p10) 25 ms frames."""
+    """dB spread between loud (p95) and quiet (p10) frames"""
     frames = mono[: len(mono) // FRAME * FRAME].reshape(-1, FRAME)
     if not len(frames):
         return 0.0
@@ -148,7 +148,7 @@ def audio_health(df: pd.DataFrame) -> pd.DataFrame:
 
 
 def budget_comparison(df: pd.DataFrame, split: str) -> pd.DataFrame:
-    """What a fixed number of utterances vs. a fixed amount of audio gives per language (one recording per sentence)."""
+    """Utterances against audio time per language with one recording per sentence"""
     test = df[df["split"] == split]
     one_per_sentence = test.sample(frac=1, random_state=SEED).drop_duplicates(["language", "sentence_id"])
     rows = []
@@ -178,7 +178,7 @@ def style_axes(ax) -> None:
 
 
 def plot_distributions(df: pd.DataFrame, split: str, path: Path) -> None:
-    """One row per language, shared x-axis per measure."""
+    """One row per language with a shared x axis per measure"""
     test = df[df["split"] == split]
     langs = list(test["language"].unique())
     measures = [("duration", "Utterance duration (s)"), ("n_words", "Reference words per utterance"),
