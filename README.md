@@ -87,17 +87,17 @@ The `compute_type` column of each output file stores the precision used
 
 The unit of work is the utterance, one recording of one sentence
 
-| Language | Source | Utterances transcribed and scored | Utterances rated by humans |
-|---|---|---|---|
-| English | FLEURS | 350 | 80 (30 rated by both raters) |
-| Italian | FLEURS | 346 | 80 |
-| German | FLEURS | 347 | 80 |
-| Greek | FLEURS | 333 | 80 |
-| Swiss German | STT4SG-350 | 3,515 | 80 |
+| Language | Source | Evaluation utterances (transcribed and scored) | Rated items | Raters per item |
+|---|---|---|---|---|
+| English | FLEURS | 350 | 80 | 2 (BD, ICRC) |
+| Italian | FLEURS | 346 | 80 | 2 (AN, GM) |
+| German | FLEURS | 347 | 80 | 2 (CM, KH) |
+| Greek | FLEURS | 333 | 80 | 2 (EG, MP) |
+| Swiss German | STT4SG-350 | 3,515 | 80 | 2 (JH, JM) |
 
-For FLEURS this is one recording per unique test sentence
-Each rated item is one utterance with the output of one model, chosen by WER band
-Fine-tuning for Greek uses 3,215 training utterances (10 h)
+For FLEURS the evaluation set is one recording per unique test sentence, out of 647 English and 650 Greek test recordings
+Both raters of a language scored the same 80 items, each item being one utterance with the output of one model
+Fine-tuning for Greek used 3,215 training utterances (10 h), which are separate from the evaluation set
 
 ## Fine-tuning runs
 
