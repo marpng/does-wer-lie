@@ -43,3 +43,6 @@ Diary.md
 results_package.zip
 src.zip
 Archiv/
+
+# Test cache
+.pytest_cache/

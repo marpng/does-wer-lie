@@ -48,6 +48,7 @@ All scripts are in `src/` and run from the repository root
 | `finetune_lora.py` | LoRA fine-tunes Whisper small on FLEURS train and exports a faster-whisper model |
 | `analyse_finetuning.py` | WER and CER gain from fine-tuning with bootstrap intervals (Q3) |
 | `analyse_error_types.py` | which error types fine-tuning removed (Q3) |
+| `plot_wer_vs_human.py` | figure of the mean human score per WER band and language |
 
 `rating_sheet_template.html` is the page used by `build_rating_sheet.py`
 
@@ -101,6 +102,16 @@ python src/analyse_error_types.py --language gsw --baseline small --tuned small-
 
 Decoding uses beam size 5, no VAD and no conditioning on previous text
 The `compute_type` column of each output file stores the precision used
+
+## Tests
+
+```bash
+pip install -r requirements-dev.txt
+python -m pytest tests
+```
+
+The tests cover the normalisers, the WER and CER counting, the agreement measures (weighted kappa and Gwet's AC2), the evaluation-set selection, the WER bands, the error-type sorter and the figure script
+They run in about a second and need no audio, models or downloads
 
 ## Fine-tuning runs
 
@@ -171,6 +182,8 @@ Full numbers are in `reports/data_exploration/summary.md`
 - Swiss German references are Standard German translations, not transcripts of the dialect
 
 ## Data licences
+
+The code is released under the MIT licence (see `LICENSE`)
 
 FLEURS is CC BY 4.0
 
